@@ -23,7 +23,7 @@ public class GpsEvent {
      * @return a string representation of the value of this object.
      */
     public String toString(){
-        return this.name+" | lat:"+this.latitude+" lon:"+this.longitude+" alt:"+this.altitude;
+        return this.name+" | lat:"+this.latitude+" lon:"+this.longitude;
     }
 
 } 

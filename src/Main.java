@@ -1,21 +1,37 @@
 import nz.sodium.*;
+import swidgets.*;
+import javax.swing.*;
+import java.awt.*;
 
-/** 
- * An example of how to use the GpsService class
- */
 public class Main {
+    public static void main(String[] args) {
+        JFrame frame = new JFrame("FRP GPS Tracker Display");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setLayout(new GridLayout(5, 2));
 
-    public static void main(String[] args){
+        GpsService service = new GpsService();
+        Stream<GpsEvent>[] streams = service.getEventStreams();
 
-        // Initialise the GPS Service
-        GpsService serv = new GpsService();
-        // Retrieve Event Streams
-        Stream<GpsEvent>[] streams = serv.getEventStreams();
+        for (int i = 0; i < streams.length; i++) {
+            int trackerId = i;
 
-        // Attach a handler method to each stream
-        for(Stream<GpsEvent> s : streams){
-            s.listen((GpsEvent ev) -> System.out.println(ev));
+            Stream<String> displayStream = streams[i].map(ev ->
+            	ev.toString()
+            );
+
+            Cell<String> latest = displayStream.hold("Tracker" + trackerId + " | waiting...");
+
+            SLabel label = new SLabel(latest);
+
+            JPanel panel = new JPanel();
+            panel.setBorder(BorderFactory.createTitledBorder("Tracker " + trackerId));
+            panel.add(label);
+
+            frame.add(panel);
         }
-    }
 
-} 
+        frame.pack();
+        frame.setSize(800, 400);
+        frame.setVisible(true);
+    }
+}
