@@ -3,7 +3,7 @@ import nz.sodium.*;
 /** 
  * An example of how to use the GpsService class
  */
-public class Example {
+public class Main {
 
     public static void main(String[] args){
 
