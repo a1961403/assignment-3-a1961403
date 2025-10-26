@@ -27,7 +27,7 @@ public class GpsEvent {
     }
     
     public String toStringRemoved(){
-        return this.name+" | lat:"+this.latitude+" lon:"+this.longitude;
+        return "lat:"+this.latitude+" lon:"+this.longitude;
     }
 
 } 

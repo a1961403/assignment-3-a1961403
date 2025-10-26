@@ -8,20 +8,28 @@ public class FrameManger {
     public void mainFrame(Stream<GpsEvent>[] streams) {
         JFrame frame = new JFrame("FRP GPS Tracker Display");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setLayout(new BorderLayout());
+        frame.setLayout(new BorderLayout(5, 5));
 
         JPanel trackersPanel = new JPanel(new GridLayout(2, 5, 5, 5));
         tenTrackers(streams, trackersPanel);
         frame.add(trackersPanel, BorderLayout.CENTER);
 
-        
+        JPanel infoPanel = new JPanel();
+        infoPanel.setLayout(new BoxLayout(infoPanel, BoxLayout.Y_AXIS));
+
         JPanel latestEventPanel = new JPanel();
         latestEventPanel.setBorder(BorderFactory.createTitledBorder("Latest Event"));
         latestEventField(streams, latestEventPanel);
-        frame.add(latestEventPanel, BorderLayout.SOUTH);
+        infoPanel.add(latestEventPanel);
+
+        JPanel searchPanel = new JPanel(new GridLayout(2, 5, 5, 5));
+        addSearchFields(searchPanel);
+        infoPanel.add(searchPanel);
+
+        frame.add(infoPanel, BorderLayout.SOUTH);
 
         frame.pack();
-        frame.setSize(1200, 300);
+        frame.setSize(1400, 400);
         frame.setVisible(true);
     }
 
@@ -68,4 +76,33 @@ public class FrameManger {
     	System.out.println("Build Latest Even Field completed");
     }
 
+    private void addSearchFields(JPanel panel) {
+        panel.add(new JLabel("Latitude Min"));
+        panel.add(new JLabel("Latitude Max"));
+        panel.add(new JLabel("Longitude Min"));
+        panel.add(new JLabel("Longitude Max"));
+        panel.add(new JLabel(""));
+
+        JTextField latMinField = new JTextField();
+        JTextField latMaxField = new JTextField();
+        JTextField lonMinField = new JTextField();
+        JTextField lonMaxField = new JTextField();
+        JButton searchButton = new JButton("Search");
+
+        panel.add(latMinField);
+        panel.add(latMaxField);
+        panel.add(lonMinField);
+        panel.add(lonMaxField);
+        panel.add(searchButton);
+
+        searchButton.addActionListener(e -> {
+            String latMin = latMinField.getText();
+            String latMax = latMaxField.getText();
+            String lonMin = lonMinField.getText();
+            String lonMax = lonMaxField.getText();
+            System.out.println("Search pressed:");
+            System.out.println("LatMin=" + latMin + " LatMax=" + latMax +
+                               " LonMin=" + lonMin + " LonMax=" + lonMax);
+        });
+    }
 }
