@@ -37,9 +37,7 @@ public class FrameManger {
     	System.out.println("Building 10 trackers...");
         for (int i = 0; i < streams.length; i++) {
             int trackerId = i;
-            Stream<String> displayStream = streams[i].map(ev ->
-                ev.toStringRemoved()
-            );
+            Stream<String> displayStream = streams[i].map(ev -> ev.toStringRemoved());
             Cell<String> latest = displayStream.hold("Tracker" + trackerId + " | waiting...");
             SLabel label = new SLabel(latest);
             JPanel panel = new JPanel();
@@ -52,9 +50,9 @@ public class FrameManger {
 
     private void latestEventField(Stream<GpsEvent>[] streams, JPanel container) {
     	System.out.println("Building Latest Even Field...");
-        Stream<String> merged = streams[0].map(GpsEvent::toString);
+        Stream<String> merged = streams[0].map(ev -> ev.toString());
         for (int i = 1; i < streams.length; i++) {
-            merged = merged.orElse(streams[i].map(GpsEvent::toString));
+            merged = merged.orElse(streams[i].map(ev -> ev.toString()));
         }
 
         StreamSink<String> displaySink = new StreamSink<>();
