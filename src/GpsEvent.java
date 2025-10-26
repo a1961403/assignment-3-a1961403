@@ -26,6 +26,10 @@ public class GpsEvent {
         return this.name+" | lat:"+this.latitude+" lon:"+this.longitude+" alt:"+this.altitude;
     }
     
+    public String toStringComma() {
+    	return this.name+", "+this.latitude+", "+this.longitude+", "+this.altitude;
+    }
+    
     public String toStringRemoved(){
         return "lat:"+this.latitude+" lon:"+this.longitude;
     }

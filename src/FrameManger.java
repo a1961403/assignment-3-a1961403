@@ -8,28 +8,27 @@ public class FrameManger {
     public void mainFrame(Stream<GpsEvent>[] streams) {
         JFrame frame = new JFrame("FRP GPS Tracker Display");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setLayout(new BorderLayout(5, 5));
 
-        JPanel trackersPanel = new JPanel(new GridLayout(2, 5, 5, 5));
+        JPanel mainPanel = new JPanel();
+        mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.Y_AXIS));
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        JPanel trackersPanel = new JPanel(new GridLayout(2, 5));
         tenTrackers(streams, trackersPanel);
-        frame.add(trackersPanel, BorderLayout.CENTER);
-
-        JPanel infoPanel = new JPanel();
-        infoPanel.setLayout(new BoxLayout(infoPanel, BoxLayout.Y_AXIS));
+        mainPanel.add(trackersPanel);
 
         JPanel latestEventPanel = new JPanel();
         latestEventPanel.setBorder(BorderFactory.createTitledBorder("Latest Event"));
         latestEventField(streams, latestEventPanel);
-        infoPanel.add(latestEventPanel);
+        mainPanel.add(latestEventPanel);
 
-        JPanel searchPanel = new JPanel(new GridLayout(2, 5, 5, 5));
+        JPanel searchPanel = new JPanel(new GridLayout(2, 5));
         addSearchFields(searchPanel);
-        infoPanel.add(searchPanel);
+        mainPanel.add(searchPanel);
 
-        frame.add(infoPanel, BorderLayout.SOUTH);
-
+        frame.add(mainPanel);
         frame.pack();
-        frame.setSize(1400, 400);
+        frame.setSize(1400, 300);
         frame.setVisible(true);
     }
 
