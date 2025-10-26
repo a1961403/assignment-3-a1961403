@@ -15,10 +15,10 @@ public class FrameManger {
         frame.add(trackersPanel, BorderLayout.CENTER);
 
         
-        JPanel bottomPanel = new JPanel();
-        bottomPanel.setBorder(BorderFactory.createTitledBorder("Latest Event"));
-        latestEventField(streams, bottomPanel);
-        frame.add(bottomPanel, BorderLayout.SOUTH);
+        JPanel latestEventPanel = new JPanel();
+        latestEventPanel.setBorder(BorderFactory.createTitledBorder("Latest Event"));
+        latestEventField(streams, latestEventPanel);
+        frame.add(latestEventPanel, BorderLayout.SOUTH);
 
         frame.pack();
         frame.setSize(1200, 300);
