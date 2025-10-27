@@ -2,6 +2,7 @@ import java.awt.*;
 import javax.swing.*;
 import nz.sodium.*;
 import swidgets.*;
+import java.util.List;
 
 public class FrameManger {
 	
@@ -45,7 +46,6 @@ public class FrameManger {
     }
 
     private void tenTrackers(Stream<GpsEvent>[] streams, JPanel container) {
-    	System.out.println("Building 10 trackers...");
         for (int i = 0; i < streams.length; i++) {
             int trackerId = i;
             Stream<String> displayStream = streams[i].map(ev -> ev.toStringRemoved());
@@ -56,11 +56,9 @@ public class FrameManger {
             panel.add(label);
             container.add(panel);
         }
-        System.out.println("Build 10 trackers completed");
     }
 
     private void latestEventField(Stream<GpsEvent>[] streams, JPanel container) {
-    	System.out.println("Building Latest Even Field...");
         Stream<String> merged = streams[0].map(ev -> ev.toString());
         for (int i = 1; i < streams.length; i++) {
             merged = merged.orElse(streams[i].map(ev -> ev.toString()));
@@ -83,31 +81,26 @@ public class FrameManger {
         });
         
         container.add(label);
-    	System.out.println("Build Latest Even Field completed");
     }
 
     private void filteredEventField(Stream<GpsEvent>[] streams, JPanel container) {
-        System.out.println("Building Filtered 10 trackers...");
         container.setLayout(new BorderLayout());
         
-        JPanel rangePanel = new JPanel();
-        rangePanel.setLayout(new FlowLayout(FlowLayout.LEFT));
+        JPanel rangePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         rangePanel.setBorder(BorderFactory.createTitledBorder("Current Range"));
-
         Cell<String> rangeText = latMinCell.lift(latMaxCell, lonMinCell, lonMaxCell,
             (latMin, latMax, lonMin, lonMax) ->
-                String.format("Lat[%.2f ~ %.2f], Lon[%.2f ~ %.2f]", latMin, latMax, lonMin, lonMax)
+                String.format("Lat[%.2f~%.2f], Lon[%.2f~%.2f]", latMin, latMax, lonMin, lonMax)
         );
-
-        SLabel rangeLabel = new SLabel(rangeText);
-        rangePanel.add(rangeLabel);
+        rangePanel.add(new SLabel(rangeText));
         container.add(rangePanel, BorderLayout.NORTH);
-        
+
         JPanel trackerPanel = new JPanel(new GridLayout(2, 5, 5, 5));
 
         for (int i = 0; i < streams.length; i++) {
             int trackerId = i;
             Stream<GpsEvent> gpsStream = streams[i];
+            java.util.List<GpsEvent> eventList = new java.util.ArrayList<>();
 
             Stream<GpsEvent> filteredGpsStream = gpsStream.filter(ev -> {
                 double latMin = latMinCell.sample();
@@ -139,16 +132,49 @@ public class FrameManger {
             Stream<String> combinedStream = filteredDisplayStream.orElse(outOfRangeStream);
 
             Cell<String> latest = combinedStream.hold("waiting...");
-            SLabel label = new SLabel(latest);
+            SLabel trackerLabel = new SLabel(latest);
+
+            Stream<String> distanceStream = gpsStream.orElse(rangeUpdateSink.map(u -> null)).map(ev -> {
+                long now = System.currentTimeMillis();
+                if (ev != null) {
+                    ev.timestamp = now;
+                    eventList.removeIf(e -> now - e.timestamp > 5 * 60 * 1000);
+                    eventList.add(ev);
+                }
+
+                double latMin = latMinCell.sample();
+                double latMax = latMaxCell.sample();
+                double lonMin = lonMinCell.sample();
+                double lonMax = lonMaxCell.sample();
+                List<GpsEvent> inRangeList = eventList.stream()
+                        .filter(e -> e.latitude >= latMin && e.latitude <= latMax &&
+                                     e.longitude >= lonMin && e.longitude <= lonMax)
+                        .toList();
+
+                if (inRangeList.size() < 2)
+                    return "Distance (last 5 min): 0 m";
+
+                double total = 0;
+                for (int j = 1; j < inRangeList.size(); j++) {
+                    total += calculateDistance(inRangeList.get(j-1), inRangeList.get(j));
+                }
+
+                return String.format("Distance (last 5 min): %.0f m", total);
+            });
+
+            Cell<String> latestDistance = distanceStream.hold("Distance (last 5 min): 0 m");
+            SLabel distanceLabel = new SLabel(latestDistance);
 
             JPanel panel = new JPanel();
-            panel.setBorder(BorderFactory.createTitledBorder("Filtered Tracker " + trackerId));
-            panel.add(label);
+            panel.setLayout(new GridLayout(2, 1));
+            panel.setBorder(BorderFactory.createTitledBorder("Tracker " + trackerId));
+            panel.add(trackerLabel);
+            panel.add(distanceLabel);
+
             trackerPanel.add(panel);
         }
 
         container.add(trackerPanel, BorderLayout.CENTER);
-        System.out.println("Build Filtered 10 trackers completed");
     }
 
     private void addSearchFields(JPanel panel) {
@@ -183,5 +209,12 @@ public class FrameManger {
                 System.out.println(ex.getMessage());
             }
         });
+    }
+    
+    private double calculateDistance(GpsEvent a, GpsEvent b) {
+        double latDiff = (a.latitude - b.latitude) * 111_000;
+        double lonDiff = (a.longitude - b.longitude) * 111_000;
+        double altDiff = (a.altitude - b.altitude) * 0.3048;
+        return Math.sqrt(latDiff * latDiff + lonDiff * lonDiff + altDiff * altDiff);
     }
 }

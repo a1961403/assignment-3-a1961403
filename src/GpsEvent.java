@@ -7,6 +7,7 @@ public class GpsEvent {
     public double latitude;     // The Latitude of the GPS event as a value from -90.0 to +90.0
     public double longitude;    // The Longitude of the GPS event as a value from -180.0 to +180.0
     public double altitude;     // The Altitude of the GPS event in feet
+    public long timestamp;
 
     /** 
      * Creates a GpsEvent
