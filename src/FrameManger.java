@@ -88,7 +88,22 @@ public class FrameManger {
 
     private void filteredEventField(Stream<GpsEvent>[] streams, JPanel container) {
         System.out.println("Building Filtered 10 trackers...");
-        container.setLayout(new GridLayout(2, 5, 5, 5));
+        container.setLayout(new BorderLayout());
+        
+        JPanel rangePanel = new JPanel();
+        rangePanel.setLayout(new FlowLayout(FlowLayout.LEFT));
+        rangePanel.setBorder(BorderFactory.createTitledBorder("Current Range"));
+
+        Cell<String> rangeText = latMinCell.lift(latMaxCell, lonMinCell, lonMaxCell,
+            (latMin, latMax, lonMin, lonMax) ->
+                String.format("Lat[%.2f ~ %.2f], Lon[%.2f ~ %.2f]", latMin, latMax, lonMin, lonMax)
+        );
+
+        SLabel rangeLabel = new SLabel(rangeText);
+        rangePanel.add(rangeLabel);
+        container.add(rangePanel, BorderLayout.NORTH);
+        
+        JPanel trackerPanel = new JPanel(new GridLayout(2, 5, 5, 5));
 
         for (int i = 0; i < streams.length; i++) {
             int trackerId = i;
@@ -129,9 +144,10 @@ public class FrameManger {
             JPanel panel = new JPanel();
             panel.setBorder(BorderFactory.createTitledBorder("Filtered Tracker " + trackerId));
             panel.add(label);
-            container.add(panel);
+            trackerPanel.add(panel);
         }
 
+        container.add(trackerPanel, BorderLayout.CENTER);
         System.out.println("Build Filtered 10 trackers completed");
     }
 
