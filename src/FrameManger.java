@@ -4,6 +4,13 @@ import nz.sodium.*;
 import swidgets.*;
 
 public class FrameManger {
+	
+	private StreamSink<Unit> rangeUpdateSink = new StreamSink<>();
+
+    private CellSink<Double> latMinCell = new CellSink<>(-90.0);
+    private CellSink<Double> latMaxCell = new CellSink<>(90.0);
+    private CellSink<Double> lonMinCell = new CellSink<>(-180.0);
+    private CellSink<Double> lonMaxCell = new CellSink<>(180.0);
 
     public void mainFrame(Stream<GpsEvent>[] streams) {
         JFrame frame = new JFrame("FRP GPS Tracker Display");
@@ -25,10 +32,15 @@ public class FrameManger {
         JPanel searchPanel = new JPanel(new GridLayout(2, 5));
         addSearchFields(searchPanel);
         mainPanel.add(searchPanel);
+        
+        JPanel filteredEventPanel = new JPanel();
+        filteredEventPanel.setBorder(BorderFactory.createTitledBorder("Filtered Events (within range)"));
+        filteredEventField(streams, filteredEventPanel);
+        mainPanel.add(filteredEventPanel);
 
         frame.add(mainPanel);
         frame.pack();
-        frame.setSize(1400, 300);
+        frame.setSize(1400, 450);
         frame.setVisible(true);
     }
 
@@ -63,6 +75,7 @@ public class FrameManger {
         Timer[] timerRef = new Timer[1];
         timerRef[0] = new Timer(3000, e -> displaySink.send("Waiting for tracker events..."));
         timerRef[0].setRepeats(false);
+        merged.listen(ev -> { timerRef[0].stop(); timerRef[0].start(); });
 
         merged.listen(ev -> {
             timerRef[0].stop();
@@ -71,6 +84,55 @@ public class FrameManger {
         
         container.add(label);
     	System.out.println("Build Latest Even Field completed");
+    }
+
+    private void filteredEventField(Stream<GpsEvent>[] streams, JPanel container) {
+        System.out.println("Building Filtered 10 trackers...");
+        container.setLayout(new GridLayout(2, 5, 5, 5));
+
+        for (int i = 0; i < streams.length; i++) {
+            int trackerId = i;
+            Stream<GpsEvent> gpsStream = streams[i];
+
+            Stream<GpsEvent> filteredGpsStream = gpsStream.filter(ev -> {
+                double latMin = latMinCell.sample();
+                double latMax = latMaxCell.sample();
+                double lonMin = lonMinCell.sample();
+                double lonMax = lonMaxCell.sample();
+                return ev.latitude >= latMin && ev.latitude <= latMax &&
+                       ev.longitude >= lonMin && ev.longitude <= lonMax;
+            });
+
+            Stream<String> filteredDisplayStream = filteredGpsStream.map(GpsEvent::toStringRemoved);
+
+            Stream<String> outOfRangeStream = rangeUpdateSink.snapshot(
+                gpsStream.hold(null),
+                (u, lastEv) -> {
+                    if (lastEv == null) return "waiting...";
+                    double latMin = latMinCell.sample();
+                    double latMax = latMaxCell.sample();
+                    double lonMin = lonMinCell.sample();
+                    double lonMax = lonMaxCell.sample();
+                    boolean inRange = lastEv.latitude >= latMin && lastEv.latitude <= latMax &&
+                                      lastEv.longitude >= lonMin && lastEv.longitude <= lonMax;
+                    return inRange
+                        ? lastEv.toStringRemoved()
+                        : "Out of Range";
+                }
+            );
+
+            Stream<String> combinedStream = filteredDisplayStream.orElse(outOfRangeStream);
+
+            Cell<String> latest = combinedStream.hold("waiting...");
+            SLabel label = new SLabel(latest);
+
+            JPanel panel = new JPanel();
+            panel.setBorder(BorderFactory.createTitledBorder("Filtered Tracker " + trackerId));
+            panel.add(label);
+            container.add(panel);
+        }
+
+        System.out.println("Build Filtered 10 trackers completed");
     }
 
     private void addSearchFields(JPanel panel) {
@@ -84,7 +146,7 @@ public class FrameManger {
         JTextField latMaxField = new JTextField();
         JTextField lonMinField = new JTextField();
         JTextField lonMaxField = new JTextField();
-        JButton searchButton = new JButton("Search");
+        JButton searchButton = new JButton("Set Range");
 
         panel.add(latMinField);
         panel.add(latMaxField);
@@ -93,13 +155,17 @@ public class FrameManger {
         panel.add(searchButton);
 
         searchButton.addActionListener(e -> {
-            String latMin = latMinField.getText();
-            String latMax = latMaxField.getText();
-            String lonMin = lonMinField.getText();
-            String lonMax = lonMaxField.getText();
-            System.out.println("Search pressed:");
-            System.out.println("LatMin=" + latMin + " LatMax=" + latMax +
-                               " LonMin=" + lonMin + " LonMax=" + lonMax);
+            try {
+                latMinCell.send(Double.parseDouble(latMinField.getText().isEmpty()?"-90":latMinField.getText()));
+                latMaxCell.send(Double.parseDouble(latMaxField.getText().isEmpty()?"90":latMaxField.getText()));
+                lonMinCell.send(Double.parseDouble(lonMinField.getText().isEmpty()?"-180":lonMinField.getText()));
+                lonMaxCell.send(Double.parseDouble(lonMaxField.getText().isEmpty()?"180":lonMinField.getText()));
+
+                rangeUpdateSink.send(Unit.UNIT);
+
+            } catch (Exception ex) {
+                System.out.println(ex.getMessage());
+            }
         });
     }
 }
