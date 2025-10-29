@@ -35,13 +35,18 @@ public class FrameManger {
         mainPanel.add(searchPanel);
         
         JPanel filteredEventPanel = new JPanel();
-        filteredEventPanel.setBorder(BorderFactory.createTitledBorder("Filtered Events (within range)"));
+        filteredEventPanel.setBorder(BorderFactory.createTitledBorder("Filtered Events"));
         filteredEventField(streams, filteredEventPanel);
         mainPanel.add(filteredEventPanel);
+        
+        JPanel combinedFilteredPanel = new JPanel();
+        combinedFilteredPanel.setBorder(BorderFactory.createTitledBorder("Latest Filtered Event"));
+        combinedFilteredDisplay(streams, combinedFilteredPanel);
+        mainPanel.add(combinedFilteredPanel);
 
         frame.add(mainPanel);
         frame.pack();
-        frame.setSize(1400, 450);
+        frame.setSize(1400, 500);
         frame.setVisible(true);
     }
 
@@ -86,7 +91,7 @@ public class FrameManger {
     private void filteredEventField(Stream<GpsEvent>[] streams, JPanel container) {
         container.setLayout(new BorderLayout());
         
-        JPanel rangePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel rangePanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
         rangePanel.setBorder(BorderFactory.createTitledBorder("Current Range"));
         Cell<String> rangeText = latMinCell.lift(latMaxCell, lonMinCell, lonMaxCell,
             (latMin, latMax, lonMin, lonMax) ->
@@ -152,17 +157,17 @@ public class FrameManger {
                         .toList();
 
                 if (inRangeList.size() < 2)
-                    return "Distance (last 5 min): 0 m";
+                    return "Distance: 0 m";
 
                 double total = 0;
                 for (int j = 1; j < inRangeList.size(); j++) {
                     total += calculateDistance(inRangeList.get(j-1), inRangeList.get(j));
                 }
 
-                return String.format("Distance (last 5 min): %.0f m", total);
+                return String.format("Distance: %.0f m", total);
             });
 
-            Cell<String> latestDistance = distanceStream.hold("Distance (last 5 min): 0 m");
+            Cell<String> latestDistance = distanceStream.hold("Distance: 0 m");
             SLabel distanceLabel = new SLabel(latestDistance);
 
             JPanel panel = new JPanel();
@@ -176,6 +181,46 @@ public class FrameManger {
 
         container.add(trackerPanel, BorderLayout.CENTER);
     }
+    
+    private void combinedFilteredDisplay(Stream<GpsEvent>[] streams, JPanel container) {
+        Stream<GpsEvent> merged = streams[0];
+        for (int i = 1; i < streams.length; i++) {
+            merged = merged.orElse(streams[i]);
+        }
+
+        Stream<GpsEvent> filtered = merged.filter(ev -> {
+            double latMin = latMinCell.sample();
+            double latMax = latMaxCell.sample();
+            double lonMin = lonMinCell.sample();
+            double lonMax = lonMaxCell.sample();
+            return ev.latitude >= latMin && ev.latitude <= latMax &&
+                   ev.longitude >= lonMin && ev.longitude <= lonMax;
+        });
+
+        Stream<String> displayStream = filtered.map(ev -> ev.toString());
+
+        Stream<String> rangeUpdateStream = rangeUpdateSink.snapshot(
+            merged.hold(null),
+            (u, lastEv) -> {
+                if (lastEv == null) return "No in-range events yet...";
+                double latMin = latMinCell.sample();
+                double latMax = latMaxCell.sample();
+                double lonMin = lonMinCell.sample();
+                double lonMax = lonMaxCell.sample();
+                boolean inRange = lastEv.latitude >= latMin && lastEv.latitude <= latMax &&
+                                  lastEv.longitude >= lonMin && lastEv.longitude <= lonMax;
+                return inRange ? lastEv.toStringRemoved() : "No in-range events updated yet...";
+            }
+        );
+
+        Stream<String> combined = displayStream.orElse(rangeUpdateStream);
+
+        Cell<String> latestDisplay = combined.hold("No in-range events yet...");
+
+        SLabel label = new SLabel(latestDisplay);
+        container.add(label);
+    }
+
 
     private void addSearchFields(JPanel panel) {
         panel.add(new JLabel("Latitude Min"));
@@ -201,7 +246,7 @@ public class FrameManger {
                 latMinCell.send(Double.parseDouble(latMinField.getText().isEmpty()?"-90":latMinField.getText()));
                 latMaxCell.send(Double.parseDouble(latMaxField.getText().isEmpty()?"90":latMaxField.getText()));
                 lonMinCell.send(Double.parseDouble(lonMinField.getText().isEmpty()?"-180":lonMinField.getText()));
-                lonMaxCell.send(Double.parseDouble(lonMaxField.getText().isEmpty()?"180":lonMinField.getText()));
+                lonMaxCell.send(Double.parseDouble(lonMaxField.getText().isEmpty()?"180":lonMaxField.getText()));
 
                 rangeUpdateSink.send(Unit.UNIT);
 
