@@ -3,6 +3,7 @@ import javax.swing.*;
 import nz.sodium.*;
 import swidgets.*;
 import java.util.List;
+import java.util.ArrayList;
 
 public class FrameManger {
 	
@@ -48,6 +49,38 @@ public class FrameManger {
         frame.pack();
         frame.setSize(1400, 500);
         frame.setVisible(true);
+    }
+
+    public boolean isInRange(GpsEvent ev, double latMin, double latMax, double lonMin, double lonMax) {
+        return ev.latitude >= latMin && ev.latitude <= latMax &&
+               ev.longitude >= lonMin && ev.longitude <= lonMax;
+    }
+
+    public List<GpsEvent> filterEvents(List<GpsEvent> events, double latMin, double latMax, double lonMin, double lonMax) {
+        List<GpsEvent> filtered = new ArrayList<>();
+        for (GpsEvent e : events) {
+            if (isInRange(e, latMin, latMax, lonMin, lonMax))
+                filtered.add(e);
+        }
+        return filtered;
+    }
+
+    public double calculateDistance(GpsEvent a, GpsEvent b) {
+        double latDiff = (a.latitude - b.latitude) * 111_000;
+        double lonDiff = (a.longitude - b.longitude) * 111_000;
+        double altDiff = (a.altitude - b.altitude) * 0.3048;
+        return Math.sqrt(latDiff * latDiff + lonDiff * lonDiff + altDiff * altDiff);
+    }
+
+    public double calculateTotalDistance(List<GpsEvent> events) {
+        if (events.size() < 2) {
+        	return 0;
+        }
+        double total = 0;
+        for (int i = 1; i < events.size(); i++) {
+            total += calculateDistance(events.get(i-1), events.get(i));
+        }
+        return total;
     }
 
     private void tenTrackers(Stream<GpsEvent>[] streams, JPanel container) {
@@ -107,28 +140,19 @@ public class FrameManger {
             Stream<GpsEvent> gpsStream = streams[i];
             java.util.List<GpsEvent> eventList = new java.util.ArrayList<>();
 
-            Stream<GpsEvent> filteredGpsStream = gpsStream.filter(ev -> {
-                double latMin = latMinCell.sample();
-                double latMax = latMaxCell.sample();
-                double lonMin = lonMinCell.sample();
-                double lonMax = lonMaxCell.sample();
-                return ev.latitude >= latMin && ev.latitude <= latMax &&
-                       ev.longitude >= lonMin && ev.longitude <= lonMax;
-            });
+            Stream<GpsEvent> filteredGpsStream = gpsStream.filter(ev ->
+                isInRange(ev, latMinCell.sample(), latMaxCell.sample(), lonMinCell.sample(), lonMaxCell.sample())
+            );
 
             Stream<String> filteredDisplayStream = filteredGpsStream.map(GpsEvent::toStringRemoved);
 
             Stream<String> outOfRangeStream = rangeUpdateSink.snapshot(
                 gpsStream.hold(null),
                 (u, lastEv) -> {
-                    if (lastEv == null) return "waiting...";
-                    double latMin = latMinCell.sample();
-                    double latMax = latMaxCell.sample();
-                    double lonMin = lonMinCell.sample();
-                    double lonMax = lonMaxCell.sample();
-                    boolean inRange = lastEv.latitude >= latMin && lastEv.latitude <= latMax &&
-                                      lastEv.longitude >= lonMin && lastEv.longitude <= lonMax;
-                    return inRange
+                    if (lastEv == null) {
+                    	return "waiting...";
+                    }
+                    return isInRange(lastEv, latMinCell.sample(), latMaxCell.sample(), lonMinCell.sample(), lonMaxCell.sample())
                         ? lastEv.toStringRemoved()
                         : "Out of Range";
                 }
@@ -147,23 +171,11 @@ public class FrameManger {
                     eventList.add(ev);
                 }
 
-                double latMin = latMinCell.sample();
-                double latMax = latMaxCell.sample();
-                double lonMin = lonMinCell.sample();
-                double lonMax = lonMaxCell.sample();
-                List<GpsEvent> inRangeList = eventList.stream()
-                        .filter(e -> e.latitude >= latMin && e.latitude <= latMax &&
-                                     e.longitude >= lonMin && e.longitude <= lonMax)
-                        .toList();
+                List<GpsEvent> inRangeList = filterEvents(eventList,
+                        latMinCell.sample(), latMaxCell.sample(),
+                        lonMinCell.sample(), lonMaxCell.sample());
 
-                if (inRangeList.size() < 2)
-                    return "Distance: 0 m";
-
-                double total = 0;
-                for (int j = 1; j < inRangeList.size(); j++) {
-                    total += calculateDistance(inRangeList.get(j-1), inRangeList.get(j));
-                }
-
+                double total = calculateTotalDistance(inRangeList);
                 return String.format("Distance: %.0f m", total);
             });
 
@@ -188,28 +200,21 @@ public class FrameManger {
             merged = merged.orElse(streams[i]);
         }
 
-        Stream<GpsEvent> filtered = merged.filter(ev -> {
-            double latMin = latMinCell.sample();
-            double latMax = latMaxCell.sample();
-            double lonMin = lonMinCell.sample();
-            double lonMax = lonMaxCell.sample();
-            return ev.latitude >= latMin && ev.latitude <= latMax &&
-                   ev.longitude >= lonMin && ev.longitude <= lonMax;
-        });
+        Stream<GpsEvent> filtered = merged.filter(ev ->
+            isInRange(ev, latMinCell.sample(), latMaxCell.sample(), lonMinCell.sample(), lonMaxCell.sample())
+        );
 
-        Stream<String> displayStream = filtered.map(ev -> ev.toString());
+        Stream<String> displayStream = filtered.map(GpsEvent::toString);
 
         Stream<String> rangeUpdateStream = rangeUpdateSink.snapshot(
             merged.hold(null),
             (u, lastEv) -> {
-                if (lastEv == null) return "No in-range events yet...";
-                double latMin = latMinCell.sample();
-                double latMax = latMaxCell.sample();
-                double lonMin = lonMinCell.sample();
-                double lonMax = lonMaxCell.sample();
-                boolean inRange = lastEv.latitude >= latMin && lastEv.latitude <= latMax &&
-                                  lastEv.longitude >= lonMin && lastEv.longitude <= lonMax;
-                return inRange ? lastEv.toStringRemoved() : "No in-range events updated yet...";
+                if (lastEv == null) {
+                	return "No in-range events yet...";
+                }
+                return isInRange(lastEv, latMinCell.sample(), latMaxCell.sample(), lonMinCell.sample(), lonMaxCell.sample())
+                        ? lastEv.toStringRemoved()
+                        : "No in-range events updated yet...";
             }
         );
 
@@ -254,12 +259,5 @@ public class FrameManger {
                 System.out.println(ex.getMessage());
             }
         });
-    }
-    
-    private double calculateDistance(GpsEvent a, GpsEvent b) {
-        double latDiff = (a.latitude - b.latitude) * 111_000;
-        double lonDiff = (a.longitude - b.longitude) * 111_000;
-        double altDiff = (a.altitude - b.altitude) * 0.3048;
-        return Math.sqrt(latDiff * latDiff + lonDiff * lonDiff + altDiff * altDiff);
     }
 }
