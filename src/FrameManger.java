@@ -82,6 +82,17 @@ public class FrameManger {
         }
         return total;
     }
+    
+    public Stream<GpsEvent> mergeStreams(Stream<GpsEvent>[] streams) {
+        if (streams == null || streams.length == 0)
+            return new Stream<>();
+
+        Stream<GpsEvent> merged = streams[0];
+        for (int i = 1; i < streams.length; i++) {
+            merged = merged.orElse(streams[i]);
+        }
+        return merged;
+    }
 
     private void tenTrackers(Stream<GpsEvent>[] streams, JPanel container) {
         for (int i = 0; i < streams.length; i++) {
@@ -97,10 +108,8 @@ public class FrameManger {
     }
 
     private void latestEventField(Stream<GpsEvent>[] streams, JPanel container) {
-        Stream<String> merged = streams[0].map(ev -> ev.toString());
-        for (int i = 1; i < streams.length; i++) {
-            merged = merged.orElse(streams[i].map(ev -> ev.toString()));
-        }
+    	Stream<GpsEvent> mergedGps = mergeStreams(streams);
+    	Stream<String> merged = mergedGps.map(ev -> ev.toString());
 
         StreamSink<String> displaySink = new StreamSink<>();
         Stream<String> displayStream = merged.orElse(displaySink);
@@ -144,7 +153,7 @@ public class FrameManger {
                 isInRange(ev, latMinCell.sample(), latMaxCell.sample(), lonMinCell.sample(), lonMaxCell.sample())
             );
 
-            Stream<String> filteredDisplayStream = filteredGpsStream.map(GpsEvent::toStringRemoved);
+            Stream<String> filteredDisplayStream = filteredGpsStream.map(ev -> ev.toStringRemoved());
 
             Stream<String> outOfRangeStream = rangeUpdateSink.snapshot(
                 gpsStream.hold(null),
@@ -195,16 +204,13 @@ public class FrameManger {
     }
     
     private void combinedFilteredDisplay(Stream<GpsEvent>[] streams, JPanel container) {
-        Stream<GpsEvent> merged = streams[0];
-        for (int i = 1; i < streams.length; i++) {
-            merged = merged.orElse(streams[i]);
-        }
+    	Stream<GpsEvent> merged = mergeStreams(streams);
 
         Stream<GpsEvent> filtered = merged.filter(ev ->
             isInRange(ev, latMinCell.sample(), latMaxCell.sample(), lonMinCell.sample(), lonMaxCell.sample())
         );
 
-        Stream<String> displayStream = filtered.map(GpsEvent::toString);
+        Stream<String> displayStream = filtered.map(ev -> ev.toString());
 
         Stream<String> rangeUpdateStream = rangeUpdateSink.snapshot(
             merged.hold(null),
