@@ -150,8 +150,11 @@ public class FrameManger {
             java.util.List<GpsEvent> eventList = new java.util.ArrayList<>();
 
             Stream<GpsEvent> filteredGpsStream = gpsStream.filter(ev ->
-                isInRange(ev, latMinCell.sample(), latMaxCell.sample(), lonMinCell.sample(), lonMaxCell.sample())
-            );
+	            !filterEvents(List.of(ev),
+	                latMinCell.sample(), latMaxCell.sample(),
+	                lonMinCell.sample(), lonMaxCell.sample()
+	            ).isEmpty()
+	        );
 
             Stream<String> filteredDisplayStream = filteredGpsStream.map(ev -> ev.toStringRemoved());
 
@@ -161,7 +164,10 @@ public class FrameManger {
                     if (lastEv == null) {
                     	return "waiting...";
                     }
-                    return isInRange(lastEv, latMinCell.sample(), latMaxCell.sample(), lonMinCell.sample(), lonMaxCell.sample())
+                    return !filterEvents(List.of(lastEv),
+                            latMinCell.sample(), latMaxCell.sample(),
+                            lonMinCell.sample(), lonMaxCell.sample()
+                        ).isEmpty()
                         ? lastEv.toStringRemoved()
                         : "Out of Range";
                 }
@@ -206,9 +212,12 @@ public class FrameManger {
     private void combinedFilteredDisplay(Stream<GpsEvent>[] streams, JPanel container) {
     	Stream<GpsEvent> merged = mergeStreams(streams);
 
-        Stream<GpsEvent> filtered = merged.filter(ev ->
-            isInRange(ev, latMinCell.sample(), latMaxCell.sample(), lonMinCell.sample(), lonMaxCell.sample())
-        );
+    	Stream<GpsEvent> filtered = merged.filter(ev ->
+	        filterEvents(List.of(ev),
+	            latMinCell.sample(), latMaxCell.sample(),
+	            lonMinCell.sample(), lonMaxCell.sample()
+	        ).size() > 0
+	    );
 
         Stream<String> displayStream = filtered.map(ev -> ev.toString());
 
